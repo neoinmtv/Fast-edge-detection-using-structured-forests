@@ -335,7 +335,6 @@ def edgeChns(image, myparam):
         #fo.close();   
         
         if (s != myparam.shrink):
-            
             chns[k] = cv2.resize(M, None, fx=s/myparam.shrink, fy=s/myparam.shrink, interpolation=cv2.INTER_LINEAR);
             k += 1;
             H1, H2, H3, H4 = cv2.split(H);
@@ -601,11 +600,15 @@ class MyParam:
         self.seed       = 1; #seed for random stream (for reproducibility)
         self.useParfor  = 0; #if true train trees in parallel (memory intensive)
 
-def Edge_detection (image_name):
+def Edge_detection ():
         
     #I = Image.open("102061.jpg");
-    input_image = '.\\Input\\' + image_name + ".jpg";
+    input_image = os.path.join(INPUT_PATH, INPUT_NAME)
+    ##input_image = './'+INPUT+'/' + image_name + "."+IN_EXT;
     print("Doing image ", input_image);
+    #print('inpu=',INPUT_PATH)
+    #print('inpa=',INPUT_NAME)
+    #print('outp=',OUTPUT_FULL)
     I = cv2.imread(input_image);
     model = h5py.File('modelBsds.mat', 'r');
     myparam = MyParam();
@@ -645,127 +648,138 @@ def Edge_detection (image_name):
 
     E = edgedetection(model, luv_conv, chnsReg, chnsSim, myparam);
 
-    cv2.imwrite('.\\Output\\' + image_name + 'Edge.jpg', E);
+    #cv2.imwrite('./'+OUTPUT+'/' + image_name + 'Edge.jpg', E);
 
     t = (float)(myparam.stride**2)/(myparam.gtWidth**2)/myparam.nTreesEval * 1.66;
-    r = myparam.gtWidth/2
+    #r = myparam.gtWidth/2
+    r = int(myparam.gtWidth/2)
 
     new_E = np.array([[0.0]*I.shape[1]]*I.shape[0]);
 
     for row in range(I.shape[0]):
         for column in range(I.shape[1]):
-            new_E[row, column] = float(E[row + r, column + r])*t;
+          new_E[row, column] = float(E[row + r, column + r])*t;
 
     E_pad = impad(new_E, [1, 1, 1, 1],  np.float32);
     SDkernel = np.array([[1/4, 2/4, 1/4]]);
     E_conv = signal.convolve2d(E_pad, SDkernel, mode="valid");
     E_final = signal.convolve2d(E_conv, SDkernel.transpose(), mode="valid");
 
-    i_E_corr = np.array([[0.0]*E_final.shape[1]]*E_final.shape[0]);
+    #i_E_corr = np.array([[0.0]*E_final.shape[1]]*E_final.shape[0]);
     E_corr = np.array([[0.0]*E_final.shape[1]]*E_final.shape[0]);
-    E_thres = np.array([[0.0]*E_final.shape[1]]*E_final.shape[0]);
-    strong_I = np.array([[[0.0]*I.shape[2]]*I.shape[1]]*I.shape[0]);
-    edge_I = np.array([[[0.0]*I.shape[2]]*I.shape[1]]*I.shape[0]);
-    edge_I = copy.deepcopy(I);
+    #E_thres = np.array([[0.0]*E_final.shape[1]]*E_final.shape[0]);
+    #strong_I = np.array([[[0.0]*I.shape[2]]*I.shape[1]]*I.shape[0]);
+    #edge_I = np.array([[[0.0]*I.shape[2]]*I.shape[1]]*I.shape[0]);
+    #edge_I = copy.deepcopy(I);
     
     
     max_num = 0.0;
     min_num = 255.0;
 
-    max_color = [0]*I.shape[2];
-    min_color = [255]*I.shape[2];
+    #max_color = [0]*I.shape[2];
+    #min_color = [255]*I.shape[2];
 
-    for row in range(E_final.shape[0]):
-        for column in range(E_final.shape[1]):
-            #E_final[row, column] = 255 - 255*E_final[row, column];
-            for color in range(I.shape[2]):
-                strong_I[row, column, color] = int(I[row, column, color]);
-                if(max_color[color] < I[row, column, color]):
-                    max_color[color] = I[row, column, color];
-                if(min_color[color] > I[row, column, color]):
-                    min_color[color] = I[row, column, color];
-            if(max_num < E_final[row, column]):
-                max_num = E_final[row, column];
-            if(min_num > E_final[row, column]):
-                min_num = E_final[row, column];
+    ## below lines are replaced!!!
+    E_final = 255 - 255*E_final;
+    max_num = E_final.max()
+    min_num = E_final.min()
+    ## following 13 lines are replaced!!!
+    #for row in range(E_final.shape[0]):
+    #    for column in range(E_final.shape[1]):
+    #        E_final[row, column] = 255 - 255*E_final[row, column];
+    #        #for color in range(I.shape[2]):
+    #        #    strong_I[row, column, color] = int(I[row, column, color]);
+    #        #    if(max_color[color] < I[row, column, color]):
+    #        #        max_color[color] = I[row, column, color];
+    #        #    if(min_color[color] > I[row, column, color]):
+    #        #        min_color[color] = I[row, column, color];
+    #        if(max_num < E_final[row, column]):
+    #            max_num = E_final[row, column];
+    #        if(min_num > E_final[row, column]):
+    #            min_num = E_final[row, column];
     
     delta = float(max_num - min_num) / 3;
     alpha = 512;
     print ("Max: ", max_num, " min: ", min_num)    ;
-    for row in range(E_final.shape[0]):
-        for column in range(E_final.shape[1]):
-            E_corr[row, column] = (int)(255 * (float(E_final[row, column]) - min_num)  / (max_num-min_num));
-            i_E_corr[row, column] = 255 - E_corr[row, column];
-            E_thres[row, column] = 0 if (E_final[row, column] > delta) else 255;
+    ## below lines are replaced!!!
+    E_corr = (255 * (E_final.astype(np.float)-min_num)/(max_num-min_num) ).astype(int)
+    ## following 3 lines are replaced!!!
+    #for row in range(E_final.shape[0]):
+    #    for column in range(E_final.shape[1]):
+    #        E_corr[row, column] = (int)(255 * (float(E_final[row, column]) - min_num)  / (max_num-min_num));
 
-            for color in range(I.shape[2]):
-                if(row == 0):
-                    up = (int)(strong_I[row, column, color]);
-                    down = (int)(strong_I[row+1, column, color]);
-                    deltav = 1;
-                    strong_I[row, column, color] =  (int)(min(max_color[color], max(min_color[color], up + (up - down) * 2 / deltav * E_corr[row, column] / alpha)));
-                    strong_I[row+1, column, color] =  (int)(min(max_color[color], max(min_color[color], down + (down - up) * 2 / deltav * E_corr[row, column] / alpha)));
-                    if(E_final[row, column] > delta):
-                        edge_I[row, column, color] = 255;
-                        edge_I[row+1, column, color] = 255;
-                elif(row == I.shape[0]-1):
-                    up = (int)(strong_I[row-1, column, color]);
-                    down = (int)(strong_I[row, column, color]);
-                    deltav = 1;
-                    strong_I[row-1, column, color] =  (int)(min(max_color[color], max(min_color[color], up + (up - down) * 2 / deltav * E_corr[row, column] / alpha)));
-                    strong_I[row, column, color] = (int)(min(max_color[color], max(min_color[color],  down + (down - up) * 2 / deltav * E_corr[row, column] / alpha)));
-                    if(E_final[row, column] > delta):
-                        edge_I[row-1, column, color] = 255;
-                        edge_I[row, column, color] = 255;
-                else:
-                    up = (int)(strong_I[row-1, column, color]);
-                    down = (int)(strong_I[row+1, column, color]);
-                    deltav = 2;
-                    strong_I[row-1, column, color] =  int(min(max_color[color], max(min_color[color], up + (up - down) * 2 / deltav * E_corr[row, column] / alpha)));
-                    strong_I[row+1, column, color] =  int(min(max_color[color], max(min_color[color], down + (down - up) * 2 / deltav * E_corr[row, column] / alpha)));
-                    if(E_final[row, column] > delta):
-                        edge_I[row-1, column, color] = 255;
-                        edge_I[row, column, color] = 255;
-                        edge_I[row+1, column, color] = 255;
-                if(column == 0):
-                    left = (int)(strong_I[row, column, color]);
-                    right = (int)(strong_I[row, column+1, color]);
-                    deltah = 1;
-                    strong_I[row, column, color] =  int(min(max_color[color], max(min_color[color], left + (left - right) * 2 / deltah * E_corr[row, column] / alpha)));
-                    strong_I[row, column+1, color] =  int(min(max_color[color], max(min_color[color], right + (right - left) * 2 / deltah * E_corr[row, column] / alpha)));
-                    if(E_final[row, column] > delta):
-                        edge_I[row, column, color] = 255;
-                        edge_I[row, column+1, color] = 255;
-                elif(column == I.shape[1]-1 ):
-                    left = (int)(strong_I[row, column-1, color]);
-                    right = (int)(strong_I[row, column, color]);
-                    deltah = 1;
-                    strong_I[row, column-1, color] =  int(min(max_color[color], max(min_color[color], left + (left - right) * 2 / deltah * E_corr[row, column] / alpha)));
-                    strong_I[row, column, color] =  int(min(max_color[color], max(min_color[color], right + (right - left) * 2 / deltah * E_corr[row, column] / alpha)));
-                    if(E_final[row, column] > delta):
-                        edge_I[row, column-1, color] = 255;
-                        edge_I[row, column, color] = 255;
-                else:
-                    left = int(strong_I[row, column-1, color]);
-                    right = int(strong_I[row, column+1, color]);
-                    deltah = 2;
-                    strong_I[row, column-1, color] =  int(min(max_color[color], max(min_color[color], left + (left - right) * 2 / deltah * E_corr[row, column] / alpha)));
-                    strong_I[row, column+1, color] =  int(min(max_color[color], max(min_color[color], right + (right - left) * 2 / deltah * E_corr[row, column] / alpha)));
-                    if(E_final[row, column] > delta):
-                        edge_I[row, column-1, color] = 255;
-                        edge_I[row, column, color] = 255;
-                        edge_I[row, column+1, color] = 255;
-                
+#            i_E_corr[row, column] = 255 - E_corr[row, column];
+#            E_thres[row, column] = 0 if (E_final[row, column] > delta) else 255;
+#
+#            for color in range(I.shape[2]):
+#                if(row == 0):
+#                    up = (int)(strong_I[row, column, color]);
+#                    down = (int)(strong_I[row+1, column, color]);
+#                    deltav = 1;
+#                    strong_I[row, column, color] =  (int)(min(max_color[color], max(min_color[color], up + (up - down) * 2 / deltav * E_corr[row, column] / alpha)));
+#                    strong_I[row+1, column, color] =  (int)(min(max_color[color], max(min_color[color], down + (down - up) * 2 / deltav * E_corr[row, column] / alpha)));
+#                    if(E_final[row, column] > delta):
+#                        edge_I[row, column, color] = 255;
+#                        edge_I[row+1, column, color] = 255;
+#                elif(row == I.shape[0]-1):
+#                    up = (int)(strong_I[row-1, column, color]);
+#                    down = (int)(strong_I[row, column, color]);
+#                    deltav = 1;
+#                    strong_I[row-1, column, color] =  (int)(min(max_color[color], max(min_color[color], up + (up - down) * 2 / deltav * E_corr[row, column] / alpha)));
+#                    strong_I[row, column, color] = (int)(min(max_color[color], max(min_color[color],  down + (down - up) * 2 / deltav * E_corr[row, column] / alpha)));
+#                    if(E_final[row, column] > delta):
+#                        edge_I[row-1, column, color] = 255;
+#                        edge_I[row, column, color] = 255;
+#                else:
+#                    up = (int)(strong_I[row-1, column, color]);
+#                    down = (int)(strong_I[row+1, column, color]);
+#                    deltav = 2;
+#                    strong_I[row-1, column, color] =  int(min(max_color[color], max(min_color[color], up + (up - down) * 2 / deltav * E_corr[row, column] / alpha)));
+#                    strong_I[row+1, column, color] =  int(min(max_color[color], max(min_color[color], down + (down - up) * 2 / deltav * E_corr[row, column] / alpha)));
+#                    if(E_final[row, column] > delta):
+#                        edge_I[row-1, column, color] = 255;
+#                        edge_I[row, column, color] = 255;
+#                        edge_I[row+1, column, color] = 255;
+#                if(column == 0):
+#                    left = (int)(strong_I[row, column, color]);
+#                    right = (int)(strong_I[row, column+1, color]);
+#                    deltah = 1;
+#                    strong_I[row, column, color] =  int(min(max_color[color], max(min_color[color], left + (left - right) * 2 / deltah * E_corr[row, column] / alpha)));
+#                    strong_I[row, column+1, color] =  int(min(max_color[color], max(min_color[color], right + (right - left) * 2 / deltah * E_corr[row, column] / alpha)));
+#                    if(E_final[row, column] > delta):
+#                        edge_I[row, column, color] = 255;
+#                        edge_I[row, column+1, color] = 255;
+#                elif(column == I.shape[1]-1 ):
+#                    left = (int)(strong_I[row, column-1, color]);
+#                    right = (int)(strong_I[row, column, color]);
+#                    deltah = 1;
+#                    strong_I[row, column-1, color] =  int(min(max_color[color], max(min_color[color], left + (left - right) * 2 / deltah * E_corr[row, column] / alpha)));
+#                    strong_I[row, column, color] =  int(min(max_color[color], max(min_color[color], right + (right - left) * 2 / deltah * E_corr[row, column] / alpha)));
+#                    if(E_final[row, column] > delta):
+#                        edge_I[row, column-1, color] = 255;
+#                        edge_I[row, column, color] = 255;
+#                else:
+#                    left = int(strong_I[row, column-1, color]);
+#                    right = int(strong_I[row, column+1, color]);
+#                    deltah = 2;
+#                    strong_I[row, column-1, color] =  int(min(max_color[color], max(min_color[color], left + (left - right) * 2 / deltah * E_corr[row, column] / alpha)));
+#                    strong_I[row, column+1, color] =  int(min(max_color[color], max(min_color[color], right + (right - left) * 2 / deltah * E_corr[row, column] / alpha)));
+#                    if(E_final[row, column] > delta):
+#                        edge_I[row, column-1, color] = 255;
+#                        edge_I[row, column, color] = 255;
+#                        edge_I[row, column+1, color] = 255;
+#                
+#
+#    E_file = h5py.File('./'+OUTPUT+'/' + image_name + 'output_edge.mat', 'w');
+#    E_file.create_dataset('edge', data=E_final);
+#    E_file.close();
 
-    E_file = h5py.File('.\\Output\\' + image_name + 'output_edge.mat', 'w');
-    E_file.create_dataset('edge', data=E_final);
-    E_file.close();
-
-    cv2.imwrite( '.\\Output\\' + image_name+'Edge_final.jpg', E_corr);
-    cv2.imwrite('.\\Output\\' + image_name+'Edge_corr.jpg', i_E_corr);
-    cv2.imwrite('.\\Output\\' + image_name+'Edge_thres.jpg', E_thres);
-    cv2.imwrite('.\\Output\\' + image_name+'Edge_enhan.jpg', strong_I);
-    cv2.imwrite('.\\Output\\' + image_name+'Edge_wide.jpg', edge_I);
+    cv2.imwrite( OUTPUT_FULL, E_corr);
+    ###cv2.imwrite( './'+OUTPUT+'/' + image_name+'Edge_final.jpg', E_corr);
+    #cv2.imwrite('./'+OUTPUT+'/' + image_name+'Edge_corr.jpg', i_E_corr);
+    #cv2.imwrite('./'+OUTPUT+'/' + image_name+'Edge_thres.jpg', E_thres);
+    #cv2.imwrite('./'+OUTPUT+'/' + image_name+'Edge_enhan.jpg', strong_I);
+    #cv2.imwrite('./'+OUTPUT+'/' + image_name+'Edge_wide.jpg', edge_I);
     """
     plt.subplot(1,4,1),plt.imshow(I);
     plt.title('I'), plt.xticks([]), plt.yticks([]);
@@ -781,6 +795,15 @@ def Edge_detection (image_name):
     plt.show();
     """
 
-files = [f[:-4] for f in os.listdir('.\\Input\\') if re.match(r'.*\.jpg', f)];
-for f in files:
-    Edge_detection(f);
+#IN_EXT='jpg'
+#IN_EXT='png'
+INPUT='Input'
+OUTPUT='Output'
+INPUT_PATH=sys.argv[1]
+INPUT_NAME=sys.argv[2]
+OUTPUT_FULL=sys.argv[3]
+Edge_detection();
+
+#files = [f[:-4] for f in os.listdir('./'+INPUT+'/') if re.match(r'.*\.'+IN_EXT, f)];
+#for f in files:
+#  Edge_detection(f);
